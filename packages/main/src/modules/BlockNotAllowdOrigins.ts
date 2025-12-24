@@ -15,7 +15,7 @@ export class BlockNotAllowedOrigins extends AbstractSecurityRule {
 
   constructor(allowedOrigins: Set<string> = new Set) {
     super();
-    this.#allowedOrigins = structuredClone(allowedOrigins)
+    this.#allowedOrigins = allowedOrigins
   }
 
   applyRule(contents: Electron.WebContents): Promise<void> | void {

@@ -7,22 +7,28 @@ import {hardwareAccelerationMode} from './modules/HardwareAccelerationModule.js'
 import {autoUpdater} from './modules/AutoUpdater.js';
 import {allowInternalOrigins} from './modules/BlockNotAllowdOrigins.js';
 import {allowExternalUrls} from './modules/ExternalUrls.js';
+import {createWebContentsViewManager} from './modules/WebContentsViewManager.js';
 
 
 export async function initApp(initConfig: AppInitConfig) {
+  const allowedOrigins = new Set<string>(
+    initConfig.renderer instanceof URL ? [initConfig.renderer.origin] : [],
+  );
+
   const moduleRunner = createModuleRunner()
     .init(createWindowManagerModule({initConfig, openDevTools: import.meta.env.DEV}))
     .init(disallowMultipleAppInstance())
     .init(terminateAppOnLastWindowClose())
     .init(hardwareAccelerationMode({enable: false}))
     .init(autoUpdater())
+    .init(createWebContentsViewManager({allowedOrigins}));
 
     // Install DevTools extension if needed
     // .init(chromeDevToolsExtension({extension: 'VUEJS3_DEVTOOLS'}))
 
     // Security
-    .init(allowInternalOrigins(
-      new Set(initConfig.renderer instanceof URL ? [initConfig.renderer.origin] : []),
+    /*.init(allowInternalOrigins(
+      allowedOrigins,
     ))
     .init(allowExternalUrls(
       new Set(
@@ -40,7 +46,7 @@ export async function initApp(initConfig: AppInitConfig) {
           ]
           : [],
       )),
-    );
+    );*/
 
   await moduleRunner;
 }
