@@ -2,7 +2,7 @@ import {sha256sum} from './nodeCrypto.js';
 import {versions} from './versions.js';
 import {ipcRenderer} from 'electron';
 
-function send(channel: string, message: string) {
+function send(channel: string, message: unknown): Promise<unknown> {
   return ipcRenderer.invoke(channel, message);
 }
 
