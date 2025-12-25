@@ -32,5 +32,8 @@ initApp(
     preload: {
       path: fileURLToPath(import.meta.resolve('@app/preload/exposed.mjs')),
     },
+    viewPreload: {
+      path: fileURLToPath(import.meta.resolve('@app/preload/view.mjs')),
+    },
   },
 );

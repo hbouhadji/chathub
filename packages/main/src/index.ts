@@ -21,7 +21,7 @@ export async function initApp(initConfig: AppInitConfig) {
     .init(terminateAppOnLastWindowClose())
     .init(hardwareAccelerationMode({enable: false}))
     .init(autoUpdater())
-    .init(createWebContentsViewManager({allowedOrigins}));
+    .init(createWebContentsViewManager({allowedOrigins, viewPreloadPath: initConfig.viewPreload.path}));
 
     // Install DevTools extension if needed
     // .init(chromeDevToolsExtension({extension: 'VUEJS3_DEVTOOLS'}))

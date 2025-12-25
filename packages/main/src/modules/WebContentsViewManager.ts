@@ -11,16 +11,33 @@ type LayoutItem = {
 
 export class WebContentsViewManager implements AppModule {
   readonly #allowedOrigins?: Set<string>;
+  readonly #viewPreloadPath?: string;
   readonly #viewsByWindow = new WeakMap<
     BrowserWindow,
-    Map<string, {view: WebContentsView; url?: string}>
+    Map<string, {view: WebContentsView; url?: string; bounds?: LayoutItem['bounds']}>
   >();
+  readonly #viewsById = new Map<number, {window: BrowserWindow; view: WebContentsView}>();
 
-  constructor({allowedOrigins}: {allowedOrigins?: Set<string>} = {}) {
+  constructor({allowedOrigins, viewPreloadPath}: {allowedOrigins?: Set<string>; viewPreloadPath?: string} = {}) {
     this.#allowedOrigins = allowedOrigins;
+    this.#viewPreloadPath = viewPreloadPath;
   }
 
   enable({app}: ModuleContext): Promise<void> | void {
+    ipcMain.on('webcontents-view:wheel', (event, payload) => {
+      const entry = this.#viewsById.get(event.sender.id);
+      if (!entry) {
+        return;
+      }
+
+      const deltaX = (payload as {deltaX?: number} | undefined)?.deltaX;
+      if (typeof deltaX !== 'number' || !deltaX) {
+        return;
+      }
+
+      entry.window.webContents.send('webcontents-view:scroll-x', {deltaX});
+    });
+
     ipcMain.handle('webcontents-view:sync', (event, items: LayoutItem[]) => {
       if (!Array.isArray(items)) {
         return;
@@ -43,15 +60,19 @@ export class WebContentsViewManager implements AppModule {
         let entry = viewMap.get(item.id);
 
         if (!entry) {
+          const preloadPath = this.#viewPreloadPath;
           const view = new WebContentsView({
             webPreferences: {
               nodeIntegration: false,
               contextIsolation: true,
+              sandbox: false,
+              preload: preloadPath,
             },
           });
           entry = {view};
           viewMap.set(item.id, entry);
           window.contentView.addChildView(view);
+          this.#viewsById.set(view.webContents.id, {window, view});
         }
 
         if (typeof item.url === 'string' && item.url.length > 0) {
@@ -67,12 +88,14 @@ export class WebContentsViewManager implements AppModule {
           }
         }
 
-        entry.view.setBounds({
+        const bounds = {
           x: Math.round(item.bounds.x),
           y: Math.round(item.bounds.y),
           width: Math.max(0, Math.round(item.bounds.width)),
           height: Math.max(0, Math.round(item.bounds.height)),
-        });
+        };
+        entry.bounds = bounds;
+        entry.view.setBounds(bounds);
       }
 
       for (const [id, entry] of viewMap) {
@@ -81,6 +104,7 @@ export class WebContentsViewManager implements AppModule {
         }
 
         window.contentView.removeChildView(entry.view);
+        this.#viewsById.delete(entry.view.webContents.id);
         entry.view.webContents.close();
         viewMap.delete(id);
       }
@@ -94,6 +118,7 @@ export class WebContentsViewManager implements AppModule {
         }
 
         for (const entry of viewMap.values()) {
+          this.#viewsById.delete(entry.view.webContents.id);
           entry.view.webContents.close();
         }
       });
