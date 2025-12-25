@@ -68,8 +68,8 @@ export class WebContentsViewManager implements AppModule {
         }
 
         entry.view.setBounds({
-          x: Math.max(0, Math.round(item.bounds.x)),
-          y: Math.max(0, Math.round(item.bounds.y)),
+          x: Math.round(item.bounds.x),
+          y: Math.round(item.bounds.y),
           width: Math.max(0, Math.round(item.bounds.width)),
           height: Math.max(0, Math.round(item.bounds.height)),
         });
