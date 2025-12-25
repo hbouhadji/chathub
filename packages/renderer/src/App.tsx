@@ -1,17 +1,72 @@
 import 'virtual:uno.css'
-import {onCleanup, onMount} from 'solid-js'
+import {createSignal, onCleanup, onMount} from 'solid-js'
 
-const items = [
+type PanelItem = {
+  title: string
+  url: string
+}
+
+const items: PanelItem[] = [
   {title: 'ChatGPT', url: 'https://chatgpt.com'},
   {title: 'Gemini', url: 'https://gemini.google.com'},
   {title: 'Claude', url: 'https://claude.ai'},
-];
+]
+
+type PanelProps = {
+  item: PanelItem
+  index: number
+  widthOptions: number[]
+  widthClasses: Record<number, string>
+  onContentRef: (index: number, element: HTMLDivElement | undefined) => void
+}
+
+function Panel(props: PanelProps) {
+  const [widthPercent, setWidthPercent] = createSignal(50)
+
+  return (
+    <div
+      class={`shrink-0 flex flex-col border border-white/10 rounded overflow-hidden h-full ${props.widthClasses[widthPercent()]}`}
+    >
+      <div class="h-9 bg-white/5 text-white text-xs uppercase tracking-wide px-3 flex items-center justify-between gap-2">
+        <span>{props.item.title}</span>
+        <div class="flex items-center gap-1">
+          {props.widthOptions.map(option => (
+            <button
+              type="button"
+              class={`h-6 px-2 rounded border text-[10px] tracking-wide uppercase ${
+                widthPercent() === option
+                  ? 'border-white/70 text-white'
+                  : 'border-white/20 text-white/60 hover:border-white/40 hover:text-white/80'
+              }`}
+              onClick={() => setWidthPercent(option)}
+            >
+              {option}%
+            </button>
+          ))}
+        </div>
+      </div>
+      <div
+        ref={element => props.onContentRef(props.index, element)}
+        class="flex-1 bg-black"
+      />
+    </div>
+  )
+}
 
 function App() {
   const send = (window as unknown as Record<string, unknown>)[btoa('send')] as
     | ((channel: string, message: unknown) => Promise<unknown>)
     | undefined
+  const widthOptions = [25, 33, 50, 75, 100]
+  const widthClasses: Record<number, string> = {
+    25: 'w-[25vw]',
+    33: 'w-[33vw]',
+    50: 'w-[50vw]',
+    75: 'w-[75vw]',
+    100: 'w-[100vw]',
+  }
   const contentRefs: HTMLDivElement[] = []
+  let scrollRef: HTMLDivElement | undefined
   let frameId: number | undefined
 
   const syncViews = () => {
@@ -52,6 +107,7 @@ function App() {
   onMount(() => {
     syncViews()
     window.addEventListener('resize', syncViews)
+    scrollRef?.addEventListener('scroll', syncViews)
 
     const resizeObserver = new ResizeObserver(syncViews)
     for (const element of contentRefs) {
@@ -62,6 +118,7 @@ function App() {
 
     onCleanup(() => {
       window.removeEventListener('resize', syncViews)
+      scrollRef?.removeEventListener('scroll', syncViews)
       resizeObserver.disconnect()
       if (frameId !== undefined) {
         cancelAnimationFrame(frameId)
@@ -70,22 +127,22 @@ function App() {
   })
 
   return (
-    <div class="h-screen bg-black flex p-2 gap-2">
-      {items.map((item, index) => (
-        <div class="flex-1 flex flex-col border border-white/10 rounded overflow-hidden">
-          <div class="h-9 bg-white/5 text-white text-xs uppercase tracking-wide px-3 flex items-center">
-            {item.title}
-          </div>
-          <div
-            ref={element => {
+    <div ref={scrollRef} class="h-screen bg-black p-2 overflow-auto">
+      <div class="flex gap-2 h-[calc(100vh-16px)]">
+        {items.map((item, index) => (
+          <Panel
+            item={item}
+            index={index}
+            widthOptions={widthOptions}
+            widthClasses={widthClasses}
+            onContentRef={(panelIndex, element) => {
               if (element) {
-                contentRefs[index] = element
+                contentRefs[panelIndex] = element
               }
             }}
-            class="flex-1 bg-black"
           />
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
