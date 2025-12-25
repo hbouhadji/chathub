@@ -216,6 +216,7 @@ function App() {
               selectors: items.map((item, index) => ({
                 id: String(index),
                 selector: item.inputSelector,
+                sendButtonSelector: item.sendButtonSelector,
               })),
             })
           }}

@@ -65,8 +65,12 @@ export class WebContentsViewManager implements AppModule {
       }
 
       const text = (payload as {text?: string} | undefined)?.text ?? '';
-      const selectors = (payload as {selectors?: Array<{id: string; selector: string}>} | undefined)?.selectors ?? [];
-      const selectorMap = new Map(selectors.map(entry => [entry.id, entry.selector]));
+      const selectors =
+        (payload as {selectors?: Array<{id: string; selector: string; sendButtonSelector?: string}>} | undefined)
+          ?.selectors ?? [];
+      const selectorMap = new Map(
+        selectors.map(entry => [entry.id, {selector: entry.selector, sendButtonSelector: entry.sendButtonSelector}]),
+      );
 
       const viewMap = this.#viewsByWindow.get(window);
       if (!viewMap) {
@@ -76,6 +80,7 @@ export class WebContentsViewManager implements AppModule {
       const scriptBody = `
         const nodes = Array.from(document.querySelectorAll(selector));
         if (nodes.length === 0) return 0;
+        const target = nodes[0];
         for (const node of nodes) {
           if ('value' in node) {
             node.value = text;
@@ -90,19 +95,38 @@ export class WebContentsViewManager implements AppModule {
             node.dispatchEvent(new Event('change', {bubbles: true}));
           }
         }
+        const delayMs = 120;
+        if (sendButtonSelector) {
+          const button = document.querySelector(sendButtonSelector);
+          if (button && 'click' in button) {
+            setTimeout(() => button.click(), delayMs);
+            return nodes.length;
+          }
+        }
+        if (target && 'focus' in target) {
+          target.focus();
+          const eventInit = {bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13};
+          setTimeout(() => {
+            target.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+            target.dispatchEvent(new KeyboardEvent('keypress', eventInit));
+            target.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+          }, delayMs);
+        }
         return nodes.length;
       `;
 
       for (const [id, entry] of viewMap) {
-        const selector = selectorMap.get(id);
-        if (!selector) {
+        const entrySelectors = selectorMap.get(id);
+        if (!entrySelectors) {
           continue;
         }
 
         try {
-          const perViewScript = `(function(text, selector) {${scriptBody}})(${JSON.stringify(
+          const perViewScript = `(function(text, selector, sendButtonSelector) {${scriptBody}})(${JSON.stringify(
             text,
-          )}, ${JSON.stringify(selector)});`;
+          )}, ${JSON.stringify(entrySelectors.selector)}, ${JSON.stringify(
+            entrySelectors.sendButtonSelector ?? null,
+          )});`;
           await entry.view.webContents.executeJavaScript(perViewScript, true);
         } catch {
           // Ignore per-view failures to keep best-effort behavior.
