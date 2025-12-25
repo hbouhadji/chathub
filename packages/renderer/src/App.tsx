@@ -25,7 +25,7 @@ function Panel(props: PanelProps) {
 
   return (
     <div
-      class={`shrink-0 flex flex-col border border-white/10 rounded overflow-hidden h-full ${props.widthClasses[widthPercent()]}`}
+      class={`shrink-0 flex flex-col border border-white/10 overflow-hidden h-full ${props.widthClasses[widthPercent()]}`}
     >
       <div class="h-9 bg-white/5 text-white text-xs uppercase tracking-wide px-3 flex items-center justify-between gap-2">
         <span>{props.item.title}</span>
@@ -84,6 +84,7 @@ function App() {
   }
   const contentRefs: HTMLDivElement[] = []
   let scrollRef: HTMLDivElement | undefined
+  let textareaRef: HTMLTextAreaElement | undefined
   let frameId: number | undefined
 
   const syncViews = () => {
@@ -125,6 +126,7 @@ function App() {
     syncViews()
     window.addEventListener('resize', syncViews)
     scrollRef?.addEventListener('scroll', syncViews)
+    resizeTextarea()
     const unsubscribe =
       onMessage?.('webcontents-view:scroll-x', message => {
         const deltaX = (message as {deltaX?: number} | undefined)?.deltaX
@@ -155,22 +157,59 @@ function App() {
     })
   })
 
+  const resizeTextarea = () => {
+    if (!textareaRef) {
+      return
+    }
+
+    const maxHeight = 160
+    textareaRef.style.height = 'auto'
+    const nextHeight = Math.min(textareaRef.scrollHeight, maxHeight)
+    textareaRef.style.height = `${nextHeight}px`
+    textareaRef.style.overflowY = textareaRef.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    syncViews()
+  }
+
   return (
-    <div ref={scrollRef} class="h-screen bg-black p-2 overflow-auto">
-      <div class="flex gap-2 h-[calc(100vh-16px)]">
-        {items.map((item, index) => (
-          <Panel
-            item={item}
-            index={index}
-            widthOptions={widthOptions}
-            widthClasses={widthClasses}
-            onContentRef={(panelIndex, element) => {
-              if (element) {
-                contentRefs[panelIndex] = element
-              }
-            }}
-          />
-        ))}
+    <div class="h-screen bg-black p-2 flex flex-col gap-2">
+      <div ref={scrollRef} class="flex-1 min-h-0 overflow-auto">
+        <div class="flex gap-2 h-full min-h-0">
+          {items.map((item, index) => (
+            <Panel
+              item={item}
+              index={index}
+              widthOptions={widthOptions}
+              widthClasses={widthClasses}
+              onContentRef={(panelIndex, element) => {
+                if (element) {
+                  contentRefs[panelIndex] = element
+                }
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div class="border border-white/20 flex items-stretch">
+        <textarea
+          ref={element => {
+            if (element) {
+              textareaRef = element
+            }
+          }}
+          placeholder="Ask anything"
+          class="flex-1 bg-black text-white resize-none outline-none leading-6 p-2"
+          onInput={resizeTextarea}
+        />
+        <button
+          type="button"
+          class="px-3 border-l border-white/20 text-[10px] tracking-wide uppercase text-white/70 hover:text-white/90"
+          onClick={() => {
+
+          }}
+        >
+          Send
+        </button>
       </div>
     </div>
   )
