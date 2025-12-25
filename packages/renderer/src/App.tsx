@@ -57,6 +57,9 @@ function App() {
   const send = (window as unknown as Record<string, unknown>)[btoa('send')] as
     | ((channel: string, message: unknown) => Promise<unknown>)
     | undefined
+  const onMessage = (window as unknown as Record<string, unknown>)[btoa('on')] as
+    | ((channel: string, listener: (message: unknown) => void) => () => void)
+    | undefined
   const widthOptions = [25, 33, 50, 75, 100]
   const widthClasses: Record<number, string> = {
     25: 'w-[25vw]',
@@ -108,6 +111,19 @@ function App() {
     syncViews()
     window.addEventListener('resize', syncViews)
     scrollRef?.addEventListener('scroll', syncViews)
+    const unsubscribe =
+      onMessage?.('webcontents-view:scroll-x', message => {
+        const deltaX = (message as {deltaX?: number} | undefined)?.deltaX
+        if (typeof deltaX !== 'number' || !scrollRef) {
+          return
+        }
+
+        if (import.meta.env.DEV) {
+          console.log('[renderer] scroll-x', deltaX)
+        }
+
+        scrollRef.scrollBy({left: deltaX, behavior: 'auto'})
+      }) ?? undefined
 
     const resizeObserver = new ResizeObserver(syncViews)
     for (const element of contentRefs) {
@@ -119,6 +135,9 @@ function App() {
     onCleanup(() => {
       window.removeEventListener('resize', syncViews)
       scrollRef?.removeEventListener('scroll', syncViews)
+      if (unsubscribe) {
+        unsubscribe()
+      }
       resizeObserver.disconnect()
       if (frameId !== undefined) {
         cancelAnimationFrame(frameId)

@@ -13,6 +13,9 @@
     "./exposed.mjs": {
       "types": "./src/exposed.d.ts",
       "default": "./dist/exposed.mjs"
+    },
+    "./view.mjs": {
+      "default": "./dist/view.mjs"
     }
   },
   "devDependencies": {

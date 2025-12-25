@@ -13,7 +13,7 @@ export default /**
     target: `chrome${getChromeMajorVersion()}`,
     assetsDir: '.',
     lib: {
-      entry: ['src/exposed.ts', 'virtual:browser.js'],
+      entry: ['src/exposed.ts', 'src/view.ts', 'virtual:browser.js'],
     },
     rollupOptions: {
       output: [
