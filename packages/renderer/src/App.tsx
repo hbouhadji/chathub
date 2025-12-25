@@ -2,16 +2,16 @@ import 'virtual:uno.css'
 import {onCleanup, onMount} from 'solid-js'
 
 const items = [
-  {url: 'https://chatgpt.com'},
-  {url: 'https://gemini.google.com'},
-  {url: 'https://claude.ai'},
+  {title: 'ChatGPT', url: 'https://chatgpt.com'},
+  {title: 'Gemini', url: 'https://gemini.google.com'},
+  {title: 'Claude', url: 'https://claude.ai'},
 ];
 
 function App() {
   const send = (window as unknown as Record<string, unknown>)[btoa('send')] as
     | ((channel: string, message: unknown) => Promise<unknown>)
     | undefined
-  const itemRefs: HTMLDivElement[] = []
+  const contentRefs: HTMLDivElement[] = []
   let frameId: number | undefined
 
   const syncViews = () => {
@@ -26,14 +26,14 @@ function App() {
     frameId = requestAnimationFrame(() => {
       const layout = items
         .map((item, index) => {
-          const element = itemRefs[index]
+          const element = contentRefs[index]
           if (!element) {
             return null
           }
 
           const rect = element.getBoundingClientRect()
           return {
-            id: String(index), // @todo:  
+            id: String(index), // @todo:
             url: item.url,
             bounds: {
               x: Math.round(rect.x),
@@ -54,7 +54,7 @@ function App() {
     window.addEventListener('resize', syncViews)
 
     const resizeObserver = new ResizeObserver(syncViews)
-    for (const element of itemRefs) {
+    for (const element of contentRefs) {
       if (element) {
         resizeObserver.observe(element)
       }
@@ -70,16 +70,21 @@ function App() {
   })
 
   return (
-    <div class="h-screen bg-black flex">
+    <div class="h-screen bg-black flex p-2 gap-2">
       {items.map((item, index) => (
-        <div
-          ref={element => {
-            if (element) {
-              itemRefs[index] = element
-            }
-          }}
-          class="flex-1"
-        ></div>
+        <div class="flex-1 flex flex-col border border-white/10 rounded overflow-hidden">
+          <div class="h-9 bg-white/5 text-white text-xs uppercase tracking-wide px-3 flex items-center">
+            {item.title}
+          </div>
+          <div
+            ref={element => {
+              if (element) {
+                contentRefs[index] = element
+              }
+            }}
+            class="flex-1 bg-black"
+          />
+        </div>
       ))}
     </div>
   )
