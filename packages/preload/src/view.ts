@@ -2,6 +2,12 @@ import {ipcRenderer} from 'electron';
 
 function getHorizontalDelta(event: WheelEvent) {
   if (event.deltaX !== 0) {
+    const absX = Math.abs(event.deltaX);
+    const absY = Math.abs(event.deltaY);
+    if (absY > 0 && absX < absY * 0.5) {
+      return 0;
+    }
+
     return event.deltaX;
   }
 
