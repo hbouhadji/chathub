@@ -4,12 +4,14 @@ import {createSignal, onCleanup, onMount} from 'solid-js'
 type PanelItem = {
   title: string
   url: string
+  inputSelector: string
+  sendButtonSelector?: string
 }
 
 const items: PanelItem[] = [
-  {title: 'ChatGPT', url: 'https://chatgpt.com'},
-  {title: 'Gemini', url: 'https://gemini.google.com'},
-  {title: 'Claude', url: 'https://claude.ai'},
+  {title: 'ChatGPT', url: 'https://chatgpt.com', inputSelector: '#prompt-textarea', sendButtonSelector: "#composer-submit-button"},
+  {title: 'Gemini', url: 'https://gemini.google.com', inputSelector: '.ql-editor'},
+  {title: 'Claude', url: 'https://claude.ai', inputSelector: 'div[contenteditable=true]', sendButtonSelector: 'button[aria-label="Send message"]'},
 ]
 
 type PanelProps = {
@@ -205,7 +207,17 @@ function App() {
           type="button"
           class="px-3 border-l border-white/20 text-[10px] tracking-wide uppercase text-white/70 hover:text-white/90"
           onClick={() => {
+            if (!send || !textareaRef) {
+              return
+            }
 
+            void send('webcontents-view:fill-inputs', {
+              text: textareaRef.value,
+              selectors: items.map((item, index) => ({
+                id: String(index),
+                selector: item.inputSelector,
+              })),
+            })
           }}
         >
           Send

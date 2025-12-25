@@ -58,6 +58,58 @@ export class WebContentsViewManager implements AppModule {
       entry.view.webContents.reload();
     });
 
+    ipcMain.handle('webcontents-view:fill-inputs', async (event, payload) => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) {
+        return;
+      }
+
+      const text = (payload as {text?: string} | undefined)?.text ?? '';
+      const selectors = (payload as {selectors?: Array<{id: string; selector: string}>} | undefined)?.selectors ?? [];
+      const selectorMap = new Map(selectors.map(entry => [entry.id, entry.selector]));
+
+      const viewMap = this.#viewsByWindow.get(window);
+      if (!viewMap) {
+        return;
+      }
+
+      const scriptBody = `
+        const nodes = Array.from(document.querySelectorAll(selector));
+        if (nodes.length === 0) return 0;
+        for (const node of nodes) {
+          if ('value' in node) {
+            node.value = text;
+            node.dispatchEvent(new InputEvent('input', {bubbles: true}));
+            node.dispatchEvent(new Event('change', {bubbles: true}));
+            continue;
+          }
+
+          if (node.isContentEditable) {
+            node.textContent = text;
+            node.dispatchEvent(new InputEvent('input', {bubbles: true}));
+            node.dispatchEvent(new Event('change', {bubbles: true}));
+          }
+        }
+        return nodes.length;
+      `;
+
+      for (const [id, entry] of viewMap) {
+        const selector = selectorMap.get(id);
+        if (!selector) {
+          continue;
+        }
+
+        try {
+          const perViewScript = `(function(text, selector) {${scriptBody}})(${JSON.stringify(
+            text,
+          )}, ${JSON.stringify(selector)});`;
+          await entry.view.webContents.executeJavaScript(perViewScript, true);
+        } catch {
+          // Ignore per-view failures to keep best-effort behavior.
+        }
+      }
+    });
+
     ipcMain.handle('webcontents-view:sync', (event, items: LayoutItem[]) => {
       if (!Array.isArray(items)) {
         return;
