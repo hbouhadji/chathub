@@ -38,6 +38,26 @@ export class WebContentsViewManager implements AppModule {
       entry.window.webContents.send('webcontents-view:scroll-x', {deltaX});
     });
 
+    ipcMain.handle('webcontents-view:reload', (event, payload) => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) {
+        return;
+      }
+
+      const id = (payload as {id?: string} | undefined)?.id;
+      if (!id) {
+        return;
+      }
+
+      const viewMap = this.#viewsByWindow.get(window);
+      const entry = viewMap?.get(id);
+      if (!entry) {
+        return;
+      }
+
+      entry.view.webContents.reload();
+    });
+
     ipcMain.handle('webcontents-view:sync', (event, items: LayoutItem[]) => {
       if (!Array.isArray(items)) {
         return;

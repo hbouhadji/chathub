@@ -43,6 +43,20 @@ function Panel(props: PanelProps) {
               {option}%
             </button>
           ))}
+          <button
+            type="button"
+            class="h-6 px-2 rounded border border-white/20 text-[10px] tracking-wide uppercase text-white/70 hover:border-white/40 hover:text-white/90"
+            onClick={() => {
+              const send = (window as unknown as Record<string, unknown>)[btoa('send')] as
+                | ((channel: string, message: unknown) => Promise<unknown>)
+                | undefined
+              if (send) {
+                void send('webcontents-view:reload', {id: String(props.index)})
+              }
+            }}
+          >
+            Reload
+          </button>
         </div>
       </div>
       <div
@@ -116,10 +130,6 @@ function App() {
         const deltaX = (message as {deltaX?: number} | undefined)?.deltaX
         if (typeof deltaX !== 'number' || !scrollRef) {
           return
-        }
-
-        if (import.meta.env.DEV) {
-          console.log('[renderer] scroll-x', deltaX)
         }
 
         scrollRef.scrollBy({left: deltaX, behavior: 'auto'})
