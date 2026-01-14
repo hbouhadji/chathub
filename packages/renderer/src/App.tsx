@@ -82,7 +82,6 @@ function App() {
     100: 'w-[100vw]',
   }
   const webviewRefs: WebviewElement[] = []
-  let textareaRef: HTMLTextAreaElement | undefined
   const [message, setMessage] = createSignal('')
 
   return (
@@ -115,11 +114,6 @@ function App() {
         <MentionTextarea
           value={message()}
           onValueChange={setMessage}
-          onRef={element => {
-            if (element) {
-              textareaRef = element
-            }
-          }}
           options={items.map(item => item.title.toLowerCase())}
           placeholder="Ask anything"
         />
@@ -127,9 +121,6 @@ function App() {
           type="button"
           class="px-3 border-l border-white/20 text-[10px] tracking-wide uppercase text-white/70 hover:text-white/90"
           onClick={() => {
-            if (!textareaRef) {
-              return
-            }
             const text = message()
             const scriptBody = `
               const nodes = Array.from(document.querySelectorAll(selector));
