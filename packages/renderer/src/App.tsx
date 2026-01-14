@@ -1,11 +1,16 @@
 import 'virtual:uno.css'
-import {createSignal, onCleanup, onMount} from 'solid-js'
+import {createSignal, onMount} from 'solid-js'
 
 type PanelItem = {
   title: string
   url: string
   inputSelector: string
   sendButtonSelector?: string
+}
+
+type WebviewElement = HTMLElement & {
+  reload?: () => void
+  executeJavaScript?: (code: string, userGesture?: boolean) => Promise<unknown>
 }
 
 const items: PanelItem[] = [
@@ -19,7 +24,8 @@ type PanelProps = {
   index: number
   widthOptions: number[]
   widthClasses: Record<number, string>
-  onContentRef: (index: number, element: HTMLDivElement | undefined) => void
+  onWebviewRef: (index: number, element: WebviewElement | undefined) => void
+  onReload: (index: number) => void
 }
 
 function Panel(props: PanelProps) {
@@ -49,33 +55,23 @@ function Panel(props: PanelProps) {
             type="button"
             class="h-6 px-2 rounded border border-white/20 text-[10px] tracking-wide uppercase text-white/70 hover:border-white/40 hover:text-white/90"
             onClick={() => {
-              const send = (window as unknown as Record<string, unknown>)[btoa('send')] as
-                | ((channel: string, message: unknown) => Promise<unknown>)
-                | undefined
-              if (send) {
-                void send('webcontents-view:reload', {id: String(props.index)})
-              }
+              props.onReload(props.index)
             }}
           >
             Reload
           </button>
         </div>
       </div>
-      <div
-        ref={element => props.onContentRef(props.index, element)}
-        class="flex-1 bg-black"
+      <webview
+        ref={element => props.onWebviewRef(props.index, element)}
+        src={props.item.url}
+        class="flex-1 w-full bg-black"
       />
     </div>
   )
 }
 
 function App() {
-  const send = (window as unknown as Record<string, unknown>)[btoa('send')] as
-    | ((channel: string, message: unknown) => Promise<unknown>)
-    | undefined
-  const onMessage = (window as unknown as Record<string, unknown>)[btoa('on')] as
-    | ((channel: string, listener: (message: unknown) => void) => () => void)
-    | undefined
   const widthOptions = [25, 33, 50, 75, 100]
   const widthClasses: Record<number, string> = {
     25: 'w-[25vw]',
@@ -84,79 +80,11 @@ function App() {
     75: 'w-[75vw]',
     100: 'w-[100vw]',
   }
-  const contentRefs: HTMLDivElement[] = []
-  let scrollRef: HTMLDivElement | undefined
+  const webviewRefs: WebviewElement[] = []
   let textareaRef: HTMLTextAreaElement | undefined
-  let frameId: number | undefined
-
-  const syncViews = () => {
-    if (!send) {
-      return
-    }
-
-    if (frameId !== undefined) {
-      cancelAnimationFrame(frameId)
-    }
-
-    frameId = requestAnimationFrame(() => {
-      const layout = items
-        .map((item, index) => {
-          const element = contentRefs[index]
-          if (!element) {
-            return null
-          }
-
-          const rect = element.getBoundingClientRect()
-          return {
-            id: String(index), // @todo:
-            url: item.url,
-            bounds: {
-              x: Math.round(rect.x),
-              y: Math.round(rect.y),
-              width: Math.round(rect.width),
-              height: Math.round(rect.height),
-            },
-          }
-        })
-        .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-
-      void send('webcontents-view:sync', layout)
-    })
-  }
 
   onMount(() => {
-    syncViews()
-    window.addEventListener('resize', syncViews)
-    scrollRef?.addEventListener('scroll', syncViews)
     resizeTextarea()
-    const unsubscribe =
-      onMessage?.('webcontents-view:scroll-x', message => {
-        const deltaX = (message as {deltaX?: number} | undefined)?.deltaX
-        if (typeof deltaX !== 'number' || !scrollRef) {
-          return
-        }
-
-        scrollRef.scrollBy({left: deltaX, behavior: 'auto'})
-      }) ?? undefined
-
-    const resizeObserver = new ResizeObserver(syncViews)
-    for (const element of contentRefs) {
-      if (element) {
-        resizeObserver.observe(element)
-      }
-    }
-
-    onCleanup(() => {
-      window.removeEventListener('resize', syncViews)
-      scrollRef?.removeEventListener('scroll', syncViews)
-      if (unsubscribe) {
-        unsubscribe()
-      }
-      resizeObserver.disconnect()
-      if (frameId !== undefined) {
-        cancelAnimationFrame(frameId)
-      }
-    })
   })
 
   const resizeTextarea = () => {
@@ -169,12 +97,11 @@ function App() {
     const nextHeight = Math.min(textareaRef.scrollHeight, maxHeight)
     textareaRef.style.height = `${nextHeight}px`
     textareaRef.style.overflowY = textareaRef.scrollHeight > maxHeight ? 'auto' : 'hidden'
-    syncViews()
   }
 
   return (
     <div class="h-screen bg-black p-2 flex flex-col gap-2">
-      <div ref={scrollRef} class="flex-1 min-h-0 overflow-auto">
+      <div class="flex-1 min-h-0 overflow-auto">
         <div class="flex gap-2 h-full min-h-0">
           {items.map((item, index) => (
             <Panel
@@ -182,9 +109,15 @@ function App() {
               index={index}
               widthOptions={widthOptions}
               widthClasses={widthClasses}
-              onContentRef={(panelIndex, element) => {
+              onWebviewRef={(panelIndex, element) => {
                 if (element) {
-                  contentRefs[panelIndex] = element
+                  webviewRefs[panelIndex] = element
+                }
+              }}
+              onReload={panelIndex => {
+                const webview = webviewRefs[panelIndex]
+                if (webview?.reload) {
+                  webview.reload()
                 }
               }}
             />
@@ -207,17 +140,56 @@ function App() {
           type="button"
           class="px-3 border-l border-white/20 text-[10px] tracking-wide uppercase text-white/70 hover:text-white/90"
           onClick={() => {
-            if (!send || !textareaRef) {
+            if (!textareaRef) {
               return
             }
+            const text = textareaRef.value
+            const scriptBody = `
+              const nodes = Array.from(document.querySelectorAll(selector));
+              if (nodes.length === 0) return 0;
+              const target = nodes[0];
+              for (const node of nodes) {
+                if ('value' in node) {
+                  node.value = text;
+                  node.dispatchEvent(new InputEvent('input', {bubbles: true}));
+                  node.dispatchEvent(new Event('change', {bubbles: true}));
+                  continue;
+                }
+                if (node.isContentEditable) {
+                  node.textContent = text;
+                  node.dispatchEvent(new InputEvent('input', {bubbles: true}));
+                  node.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+              }
+              const delayMs = 120;
+              if (sendButtonSelector) {
+                const button = document.querySelector(sendButtonSelector);
+                if (button && 'click' in button) {
+                  setTimeout(() => button.click(), delayMs);
+                  return nodes.length;
+                }
+              }
+              if (target && 'focus' in target) {
+                target.focus();
+                const eventInit = {bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13};
+                setTimeout(() => {
+                  target.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+                  target.dispatchEvent(new KeyboardEvent('keypress', eventInit));
+                  target.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                }, delayMs);
+              }
+              return nodes.length;
+            `
 
-            void send('webcontents-view:fill-inputs', {
-              text: textareaRef.value,
-              selectors: items.map((item, index) => ({
-                id: String(index),
-                selector: item.inputSelector,
-                sendButtonSelector: item.sendButtonSelector,
-              })),
+            items.forEach((item, index) => {
+              const webview = webviewRefs[index]
+              if (!webview?.executeJavaScript) {
+                return
+              }
+              const perViewScript = `(function(text, selector, sendButtonSelector) {${scriptBody}})(${JSON.stringify(
+                text,
+              )}, ${JSON.stringify(item.inputSelector)}, ${JSON.stringify(item.sendButtonSelector ?? null)});`
+              void webview.executeJavaScript(perViewScript, true).catch(() => undefined)
             })
           }}
         >

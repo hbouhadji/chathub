@@ -31,7 +31,7 @@ class WindowManager implements AppModule {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false, // Sandbox disabled because the demo of preload script depend on the Node.js api
-        webviewTag: false, // The webview tag is not recommended. Consider alternatives like an iframe or Electron's BrowserView. @see https://www.electronjs.org/docs/latest/api/webview-tag#warning
+        webviewTag: true, // Enable for local testing with <webview>.
         preload: this.#preload.path,
       },
     });
