@@ -121,7 +121,15 @@ function App() {
           type="button"
           class="px-3 border-l border-white/20 text-[10px] tracking-wide uppercase text-white/70 hover:text-white/90"
           onClick={() => {
-            const text = message()
+            const rawText = message()
+            const trimmedText = rawText.trimStart()
+            const loweredText = trimmedText.toLowerCase()
+            const mentions = items
+              .map(item => item.title.toLowerCase())
+              .filter(title => loweredText.startsWith(`@${title}`))
+            const hasTarget = mentions.length > 0
+            const text = hasTarget ? trimmedText.slice(mentions[0].length + 1).trimStart() : rawText
+
             const scriptBody = `
               const nodes = Array.from(document.querySelectorAll(selector));
               if (nodes.length === 0) return 0;
@@ -159,7 +167,11 @@ function App() {
               return nodes.length;
             `
 
+            let sent = false;
             items.forEach((item, index) => {
+              if (hasTarget && !mentions.includes(item.title.toLowerCase())) {
+                return
+              }
               const webview = webviewRefs[index]
               if (!webview?.executeJavaScript) {
                 return
@@ -168,7 +180,9 @@ function App() {
                 text,
               )}, ${JSON.stringify(item.inputSelector)}, ${JSON.stringify(item.sendButtonSelector ?? null)});`
               void webview.executeJavaScript(perViewScript, true).catch(() => undefined)
+              sent = true
             })
+            sent && setMessage('');
           }}
         >
           Send
