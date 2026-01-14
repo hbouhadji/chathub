@@ -83,6 +83,72 @@ function App() {
   }
   const webviewRefs: WebviewElement[] = []
   const [message, setMessage] = createSignal('')
+  const handleSend = () => {
+    const rawText = message()
+    const trimmedText = rawText.trimStart()
+    const loweredText = trimmedText.toLowerCase()
+    const mentions = items
+      .map(item => item.title.toLowerCase())
+      .filter(title => loweredText.startsWith(`@${title}`))
+    const hasTarget = mentions.length > 0
+    const text = hasTarget ? trimmedText.slice(mentions[0].length + 1).trimStart() : rawText
+
+    const scriptBody = `
+      const nodes = Array.from(document.querySelectorAll(selector));
+      if (nodes.length === 0) return 0;
+      const target = nodes[0];
+      for (const node of nodes) {
+        if ('value' in node) {
+          node.value = text;
+          node.dispatchEvent(new InputEvent('input', {bubbles: true}));
+          node.dispatchEvent(new Event('change', {bubbles: true}));
+          continue;
+        }
+        if (node.isContentEditable) {
+          node.textContent = text;
+          node.dispatchEvent(new InputEvent('input', {bubbles: true}));
+          node.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+      }
+      const delayMs = 120;
+      if (sendButtonSelector) {
+        const button = document.querySelector(sendButtonSelector);
+        if (button && 'click' in button) {
+          setTimeout(() => button.click(), delayMs);
+          return nodes.length;
+        }
+      }
+      if (target && 'focus' in target) {
+        target.focus();
+        const eventInit = {bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13};
+        setTimeout(() => {
+          target.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+          target.dispatchEvent(new KeyboardEvent('keypress', eventInit));
+          target.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+        }, delayMs);
+      }
+      return nodes.length;
+    `
+
+    let sent = false
+    items.forEach((item, index) => {
+      if (hasTarget && !mentions.includes(item.title.toLowerCase())) {
+        return
+      }
+      const webview = webviewRefs[index]
+      if (!webview?.executeJavaScript) {
+        return
+      }
+      const perViewScript = `(function(text, selector, sendButtonSelector) {${scriptBody}})(${JSON.stringify(
+        text,
+      )}, ${JSON.stringify(item.inputSelector)}, ${JSON.stringify(item.sendButtonSelector ?? null)});`
+      void webview.executeJavaScript(perViewScript, true).catch(() => undefined)
+      sent = true
+    })
+    if (sent) {
+      setMessage('')
+    }
+  }
 
   return (
     <div class="h-screen bg-black p-2 flex flex-col gap-2">
@@ -114,76 +180,14 @@ function App() {
         <MentionTextarea
           value={message()}
           onValueChange={setMessage}
+          onSubmit={handleSend}
           options={items.map(item => item.title.toLowerCase())}
           placeholder="Ask anything"
         />
         <button
           type="button"
           class="px-3 border-l border-white/20 text-[10px] tracking-wide uppercase text-white/70 hover:text-white/90"
-          onClick={() => {
-            const rawText = message()
-            const trimmedText = rawText.trimStart()
-            const loweredText = trimmedText.toLowerCase()
-            const mentions = items
-              .map(item => item.title.toLowerCase())
-              .filter(title => loweredText.startsWith(`@${title}`))
-            const hasTarget = mentions.length > 0
-            const text = hasTarget ? trimmedText.slice(mentions[0].length + 1).trimStart() : rawText
-
-            const scriptBody = `
-              const nodes = Array.from(document.querySelectorAll(selector));
-              if (nodes.length === 0) return 0;
-              const target = nodes[0];
-              for (const node of nodes) {
-                if ('value' in node) {
-                  node.value = text;
-                  node.dispatchEvent(new InputEvent('input', {bubbles: true}));
-                  node.dispatchEvent(new Event('change', {bubbles: true}));
-                  continue;
-                }
-                if (node.isContentEditable) {
-                  node.textContent = text;
-                  node.dispatchEvent(new InputEvent('input', {bubbles: true}));
-                  node.dispatchEvent(new Event('change', {bubbles: true}));
-                }
-              }
-              const delayMs = 120;
-              if (sendButtonSelector) {
-                const button = document.querySelector(sendButtonSelector);
-                if (button && 'click' in button) {
-                  setTimeout(() => button.click(), delayMs);
-                  return nodes.length;
-                }
-              }
-              if (target && 'focus' in target) {
-                target.focus();
-                const eventInit = {bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13};
-                setTimeout(() => {
-                  target.dispatchEvent(new KeyboardEvent('keydown', eventInit));
-                  target.dispatchEvent(new KeyboardEvent('keypress', eventInit));
-                  target.dispatchEvent(new KeyboardEvent('keyup', eventInit));
-                }, delayMs);
-              }
-              return nodes.length;
-            `
-
-            let sent = false;
-            items.forEach((item, index) => {
-              if (hasTarget && !mentions.includes(item.title.toLowerCase())) {
-                return
-              }
-              const webview = webviewRefs[index]
-              if (!webview?.executeJavaScript) {
-                return
-              }
-              const perViewScript = `(function(text, selector, sendButtonSelector) {${scriptBody}})(${JSON.stringify(
-                text,
-              )}, ${JSON.stringify(item.inputSelector)}, ${JSON.stringify(item.sendButtonSelector ?? null)});`
-              void webview.executeJavaScript(perViewScript, true).catch(() => undefined)
-              sent = true
-            })
-            sent && setMessage('');
-          }}
+          onClick={handleSend}
         >
           Send
         </button>

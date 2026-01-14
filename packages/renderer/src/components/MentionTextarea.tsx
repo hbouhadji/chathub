@@ -3,6 +3,7 @@ import {createMemo, createSignal, onMount} from 'solid-js'
 type MentionTextareaProps = {
   value: string
   onValueChange: (value: string) => void
+  onSubmit?: () => void
   onRef?: (element: HTMLTextAreaElement | undefined) => void
   options: string[]
   placeholder?: string
@@ -149,6 +150,11 @@ export default function MentionTextarea(props: MentionTextareaProps) {
           closeMentions()
         }}
         onKeyDown={event => {
+          if (event.key === 'Enter' && !event.shiftKey && !mentionOpen()) {
+            event.preventDefault()
+            props.onSubmit?.()
+            return
+          }
           if (!mentionOpen()) {
             return
           }
