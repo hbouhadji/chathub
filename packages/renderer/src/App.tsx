@@ -120,7 +120,7 @@ function App() {
               textareaRef = element
             }
           }}
-          options={[{label: 'toto label', value: 'toto-value', detail: 'First programmer'}, {label: 'tata label', value: 'tata-value', detail: 'Second programmer'}]}
+          options={items.map(item => item.title.toLowerCase())}
           placeholder="Ask anything"
         />
         <button

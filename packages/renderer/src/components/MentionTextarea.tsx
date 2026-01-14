@@ -1,16 +1,10 @@
 import {createMemo, createSignal, onMount} from 'solid-js'
 
-type MentionOption = {
-  value: string
-  // label: string
-  // detail?: string
-}
-
 type MentionTextareaProps = {
   value: string
   onValueChange: (value: string) => void
   onRef?: (element: HTMLTextAreaElement | undefined) => void
-  options: MentionOption[]
+  options: string[]
   placeholder?: string
   maxHeight?: number
   class?: string
@@ -24,15 +18,14 @@ export default function MentionTextarea(props: MentionTextareaProps) {
   const [mentionStart, setMentionStart] = createSignal<number | null>(null)
   const [mentionIndex, setMentionIndex] = createSignal(0)
 
-  const filterMentions = (query: string, list: MentionOption[]) => {
+  const filterMentions = (query: string, list: string[]) => {
     const normalized = query.trim().toLowerCase()
     if (!normalized) {
       return list
     }
     return list.filter(option => {
       return (
-        option.value.toLowerCase().includes(normalized) /*||
-        option.label.toLowerCase().includes(normalized)*/
+        option.toLowerCase().includes(normalized)
       )
     })
   }
@@ -92,7 +85,7 @@ export default function MentionTextarea(props: MentionTextareaProps) {
     setMentionIndex(0)
   }
 
-  const insertMention = (option: MentionOption) => {
+  const insertMention = (option: string) => {
     if (!textareaRef) {
       return
     }
@@ -107,7 +100,7 @@ export default function MentionTextarea(props: MentionTextareaProps) {
     const value = textareaRef.value
     const before = value.slice(0, start)
     const after = value.slice(cursorIndex)
-    const insertion = `@${option.value}`
+    const insertion = `@${option}`
     const nextValue = `${before}${insertion} ${after}`
     props.onValueChange(nextValue)
     closeMentions()
@@ -212,10 +205,8 @@ export default function MentionTextarea(props: MentionTextareaProps) {
                 }}
               >
                 <div class="flex items-center justify-between gap-2">
-                  <span>@{option.value}</span>
-                  {/*{option.detail && <span class="text-[11px] text-white/50">{option.detail}</span>}*/}
+                  <span>@{option}</span>
                 </div>
-                {/*<div class="text-xs text-white/70">{option.label}</div>*/}
               </button>
             ))}
           </div>
