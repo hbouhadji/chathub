@@ -1,5 +1,6 @@
 import 'virtual:uno.css'
-import {createSignal, onMount} from 'solid-js'
+import {createSignal} from 'solid-js'
+import MentionTextarea from './components/MentionTextarea'
 
 type PanelItem = {
   title: string
@@ -82,22 +83,7 @@ function App() {
   }
   const webviewRefs: WebviewElement[] = []
   let textareaRef: HTMLTextAreaElement | undefined
-
-  onMount(() => {
-    resizeTextarea()
-  })
-
-  const resizeTextarea = () => {
-    if (!textareaRef) {
-      return
-    }
-
-    const maxHeight = 160
-    textareaRef.style.height = 'auto'
-    const nextHeight = Math.min(textareaRef.scrollHeight, maxHeight)
-    textareaRef.style.height = `${nextHeight}px`
-    textareaRef.style.overflowY = textareaRef.scrollHeight > maxHeight ? 'auto' : 'hidden'
-  }
+  const [message, setMessage] = createSignal('')
 
   return (
     <div class="h-screen bg-black p-2 flex flex-col gap-2">
@@ -126,15 +112,16 @@ function App() {
       </div>
 
       <div class="border border-white/20 flex items-stretch">
-        <textarea
-          ref={element => {
+        <MentionTextarea
+          value={message()}
+          onValueChange={setMessage}
+          onRef={element => {
             if (element) {
               textareaRef = element
             }
           }}
+          options={[{label: 'toto label', value: 'toto-value', detail: 'First programmer'}, {label: 'tata label', value: 'tata-value', detail: 'Second programmer'}]}
           placeholder="Ask anything"
-          class="flex-1 bg-black text-white resize-none outline-none leading-6 p-2"
-          onInput={resizeTextarea}
         />
         <button
           type="button"
@@ -143,7 +130,7 @@ function App() {
             if (!textareaRef) {
               return
             }
-            const text = textareaRef.value
+            const text = message()
             const scriptBody = `
               const nodes = Array.from(document.querySelectorAll(selector));
               if (nodes.length === 0) return 0;
